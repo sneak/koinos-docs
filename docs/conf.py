@@ -47,10 +47,6 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # -- Options for HTML output -------------------------------------------------
 html_theme_options = {
-  "external_links": [
-      ("Github", "https://github.com/koinos/koinos"),
-      ("Koinos", "https://koinos.io")
-  ]
 }
 html_logo = '_static/logo-light.png'
 html_favicon = 'favicon.ico'
