@@ -1,5 +1,8 @@
 dist: focal # needed to use python 3.7
 language: python
+addons:
+  ssh_known_hosts:
+    - 173.255.232.131
 branches:
   only:
     - master

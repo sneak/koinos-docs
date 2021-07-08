@@ -52,6 +52,9 @@ input[type='text'] {
 input[type='submit']:hover {
   color: #f2e8c6;
 }
+input:focus-visible {
+  outline: none;
+}
 
 .page-nav .inner,
 .vp-sidebar .searchbox,
