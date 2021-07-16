@@ -159,89 +159,28 @@ This means we need to encode the arguments.  This can be done with the `koinos_o
 `koinos-tools`, which makes the Koinos type system's encoding / decoding functionality available to other
 programs.  (Eventually the entire type system architecture may be replaced by Cap'n Proto.)
 
-For the `balance_of` entry point, it works like this:
+If we have a Bitcoin-style address such as `1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx` we will need to serialize it
+as a string of bytes.  (This particular address is the testnet genesis address and is likely to have an
+interesting balance.  If you got tokens from the faucet, you can check the balance of your own address.)
+We then pass into `koinos_obj_serializer` and finally to Curl.  The entire process looks like this:
 
 ```
-echo '{"type" : "koinos::koin::balance_of_args", "value" : {"owner" : "z1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx"}}' | programs/koinos_object_serializer/koinos_obj_serializer
-```
-
-We'll use the genesis address (`z1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx`) as it has an interesting balance to check.
-If you got tokens from the faucet, you can check the balance of your own address.
-
-### Begin problem section
-
-I don't know what to do from here.  When I run `koinos_obj_serializer` I get
-`MGQDO4HvQDVsOveM+DVnDrvUsJ3nlonESE8E=` which corresponds to following hex bytes:
-
-```
-$ echo GQDO4HvQDVsOveM+DVnDrvUsJ3nlonESE8E= | base64 -d | hd
-00000000  19 00 ce e0 7b d0 0d 5b  0e bd e3 3e 0d 59 c3 ae  |....{..[...>.Y..|
-00000010  f5 2c 27 79 e5 a2 71 12  13 c1                    |.,'y..q...|
-```
-
-However this doesn't actually work, I get zero balance:
-
-```
+$ echo -n "1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx" | base64
+MUtyczd2MXJ0cGdSeWZ3RVpuY3VLTVFRblk1SmhxWFZTeA==
+$ echo '{"type" : "koinos::koin::balance_of_args", "value" : {"owner" : "MMUtyczd2MXJ0cGdSeWZ3RVpuY3VLTVFRblk1SmhxWFZTeA=="}}' | programs/koinos_object_serializer/koinos_obj_serializer
+MIjFLcnM3djFydHBnUnlmd0VabmN1S01RUW5ZNUpocVhWU3g=
 $ curl -X POST \
        -H 'Content-Type: application/json' \
-       -d "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"chain.read_contract\",\"params\":{\"contract_id\":\"z33qAMjTLGff2wD57oM6HbHoKSg2P\", \"entry_point\":358715976, \"args\":\"MGQDO4HvQDVsOveM+DVnDrvUsJ3nlonESE8E=\"}}" \
+       -d "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"chain.read_contract\",\"params\":{\"contract_id\":\"z33qAMjTLGff2wD57oM6HbHoKSg2P\", \"entry_point\":358715976, \"args\":\"MIjFLcnM3djFydHBnUnlmd0VabmN1S01RUW5ZNUpocVhWU3g=\"}}" \
        http://localhost:8080
-{"jsonrpc":"2.0","result":{"logs":"","result":"MAAAAAAAAAAA="},"id":2}
+{"jsonrpc":"2.0","result":{"logs":"","result":"MAAKPUUcELAA="},"id":3}
+$ echo '{"type" : "koinos::koin::balance_of_result", "bytes" : "MAAKPUUcELAA="}' | programs/koinos_object_serializer/koinos_obj_serializer -d
+{"type":"koinos::koin::balance_of_result","value":{"balance":720529200000000}}
 ```
 
-The Golang code for checking balances in the fledgling wallet shows this sequence of bytes:
+A couple notes:
 
-```
-22314b72733776317274706752796677455a6e63754b4d51516e59354a687158565378
-```
-
-which corresponds to `1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx`.
-
-Is this something special that happens for addresses only?  Are contract args unconditionally base58-encoded?  Where is this happening?
-If I have an argument type in C++, what's the process to convert it generically to a string that can be put into the `"args"`
-parameter of a `curl` command?  Is this intended behavior or a bug?
-
-### Notes and temporary garbage
-
-```
-curl -X POST \
-     -H 'Content-Type: application/json' \
-     -d "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"chain.read_contract\",\"params\":{\"account\" : \"M$B64_ADDRESS\"}}" \
-     http://localhost:8080
-```
-
-
-
-To get the balance of the address, we can use the following transaction:
-
-
-```
-{"type" : "koinos::koin::transfer_args", "value" : {"from" : "z1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx", "to" : "z1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx", "value" : 1000} }
-```
-
-For this to work, we'll need to export a definition of the smart contract's objects, which currently exists only in the
-smart contract's source code.
-
-The definition of the `koin` contract 
-
-```
-curl -X POST \
-     -H 'Content-Type: application/json' \
-     -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"chain.get_account_nonce\",\"params\":{\"account\" : \"M$B64_ADDRESS\"}}" \
-     http://localhost:8080
-```
-
-    transaction = {'id': 'z11', 'active_data': {'resource_limit': app.config["resource_limit"],
-    'nonce': app.chain.get_nonce(), 'operations': [{'type': 'koinos::protocol::call_contract_operation',
-    'value': {'contract_id': app.config["contract_id"], 'entry_point': app.config["transfer_entry_point"], 'args': args, 'extensions': {}}}]},
-    'passive_data': {}, 'signature_data': 'z11'}
-
-{"type" : "koinos::koin::transfer_args", "value" : {"from" : "z1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx", "to" : "z1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx", "value" : 1000} }
-
-
-ADDRESS="1Krs7v1rtpgRyfwEZncuKMQQnY5JhqXVSx"
-B64_ADDRESS=$(echo -n "$ADDRESS" | base64)
-curl -X POST \
-     -H 'Content-Type: application/json' \
-     -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"chain.get_account_nonce\",\"params\":{\"account\" : \"M$B64_ADDRESS\"}}" \
-     http://localhost:8080
+- Since we're using `base64pad` encoding, we prepend `M` as the multibase specifier for the `"owner"` string
+- This double encoding is [considered a bug](https://github.com/koinos/koinos-chain/issues/450) and will likely
+not be required in some future version of Koinos.
+- Getting the number of decimal places by calling `decimals()`
