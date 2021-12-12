@@ -12,6 +12,15 @@ The Koinos cluster is comprised of multiple microservices. To simplify the deplo
 $ docker compose --profile all up
 ```
 
+Note that on Ubuntu systems, the version of `docker-compose` is out of date and will not work with the provided `docker-compose.yml`, and will give an error about "invalid interpolation".  To fix this, run the following commands:
+
+```console
+sudo apt purge -y docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+hash -r
+```
+
 ## Installing on Windows
 
 1. Download and install Docker
